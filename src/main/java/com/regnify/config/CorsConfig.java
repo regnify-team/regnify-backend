@@ -33,7 +33,7 @@ public class CorsConfig {
         
         // Set allowed origins
         List<String> origins = Arrays.asList(allowedOrigins.split(","));
-        config.setAllowedOrigins(origins);
+        config.setAllowedOriginPatterns(origins);
         
         // Set allowed methods
         List<String> methods = Arrays.asList(allowedMethods.split(","));

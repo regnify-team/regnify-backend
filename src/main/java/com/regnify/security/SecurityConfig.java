@@ -4,6 +4,7 @@ package com.regnify.security;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -41,6 +42,14 @@ public class SecurityConfig {
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 .and()
             .authorizeHttpRequests(authz -> authz
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                .requestMatchers(
+                    "/auth/**",
+                    "/api/auth/**",
+                    "/dashboard/health",
+                    "/api/dashboard/health",
+                    "/error"
+                ).permitAll()
                 .requestMatchers(SecurityConstants.PUBLIC_URLS).permitAll()
                 .requestMatchers(SecurityConstants.USER_URLS).hasAnyRole("VIEWER", "SUPER_USER", "ADMIN_MODERATOR")
                 .requestMatchers(SecurityConstants.ADMIN_URLS).hasAnyRole("SUPER_USER", "ADMIN_MODERATOR")
@@ -55,7 +64,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("*"));
+        configuration.setAllowedOriginPatterns(Arrays.asList("*"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList(
             "Authorization", 
