@@ -5,6 +5,7 @@ import com.regnify.dto.request.InvoiceFilterRequest;
 import com.regnify.dto.request.InvoiceRequest;
 import com.regnify.dto.response.ApiResponse;
 import com.regnify.dto.response.InvoiceResponse;
+import com.regnify.dto.response.ValidationResponse;
 import com.regnify.service.InvoiceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -110,4 +111,14 @@ public class InvoiceController {
         
         return new ResponseEntity<>(fileContent, headers, HttpStatus.OK);
     }
+    
+    
+	@PostMapping(value = "/validate", consumes = MediaType.APPLICATION_XML_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@Operation(summary = "Validate Invoice XML")
+	@PreAuthorize("hasRole('VIEWER') or hasRole('SUPER_USER') or hasRole('ADMIN_MODERATOR')")
+	public ValidationResponse validate(@RequestBody String xml) {
+		return invoiceService.validate(xml);
+	}
+    
+    
 }

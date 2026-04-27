@@ -4,10 +4,16 @@ package com.regnify.service;
 import com.regnify.dto.request.InvoiceFilterRequest;
 import com.regnify.dto.request.InvoiceRequest;
 import com.regnify.dto.response.InvoiceResponse;
+import com.regnify.dto.response.ValidationMessage;
+import com.regnify.dto.response.ValidationResponse;
 import com.regnify.model.Invoice;
 import com.regnify.model.User;
 import com.regnify.repository.InvoiceRepository;
 import com.regnify.repository.UserRepository;
+import com.regnify.validator.ValidationStatus;
+import com.regnify.validator.Validator;
+import com.regnify.validator.XmlUtil;
+
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +26,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.w3c.dom.Document;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -27,6 +34,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -41,6 +49,7 @@ public class InvoiceService {
     private final FileStorageService fileStorageService;
     private final AuditService auditService;
     private final EmailService emailService;
+    private List<Validator> validators;
     
     private static final String UPLOAD_DIR = "uploads/invoices";
     
@@ -434,5 +443,43 @@ public class InvoiceService {
             invoice.getCreatedAt(),
             invoice.getUpdatedAt()
         );
+    }
+
+	public ValidationResponse validate(String xml) {
+		validators = List.of(
+                new com.regnify.validator.StructureValidator(),
+                new com.regnify.validator.MandateValidator(),
+                new com.regnify.validator.FormatValidator(),
+                new com.regnify.validator.DomainValidator(),
+                new com.regnify.validator.CardinalityValidator(),
+                new com.regnify.validator.BusinessRuleValidator()
+        );
+		
+		  List<ValidationMessage> messages = new ArrayList<>();
+
+	        try {
+	            Document doc = XmlUtil.parse(xml);
+
+	            for (Validator v : validators) {
+	                v.validate(doc, messages);
+	            }
+
+	        } catch (Exception e) {
+	            messages.add(new ValidationMessage(
+	                    "STRUCTURE_ERROR",
+	                    "STRUCTURAL",
+	                    "Invalid XML",
+	                    "ERROR",
+	                    "Invoice"
+	            ));
+	        }
+
+	        return new ValidationResponse(determineStatus(messages), messages);
+	}
+	
+	private String determineStatus(List<ValidationMessage> messages) {
+        return messages.stream().anyMatch(m -> m.getStatus().equals("ERROR"))
+                ? ValidationStatus.ERROR.name()
+                : ValidationStatus.PASS.name();
     }
 }
