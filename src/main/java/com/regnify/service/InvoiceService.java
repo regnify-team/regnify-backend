@@ -1,6 +1,8 @@
 // src/main/java/com/regnify/service/InvoiceService.java
 package com.regnify.service;
 
+import java.io.File;
+
 import com.regnify.dto.request.InvoiceFilterRequest;
 import com.regnify.dto.request.InvoiceRequest;
 import com.regnify.dto.response.InvoiceResponse;
@@ -17,6 +19,7 @@ import com.regnify.validator.XmlUtil;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -39,6 +42,15 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathExpressionException;
+import javax.xml.xpath.XPathFactory;
+
+import com.regnify.helper.UBLNamespaceContext;
+import com.regnify.model.ValidationRules;
+import com.regnify.repository.ValidationRulesRepository;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -50,6 +62,7 @@ public class InvoiceService {
     private final AuditService auditService;
     private final EmailService emailService;
     private List<Validator> validators;
+    private final ValidationRulesRepository validationRulesRepository;
     
     private static final String UPLOAD_DIR = "uploads/invoices";
     
@@ -482,4 +495,45 @@ public class InvoiceService {
                 ? ValidationStatus.ERROR.name()
                 : ValidationStatus.PASS.name();
     }
+
+    public List<ValidationMessage> processInvoice(String filePath) throws Exception {
+    	List<ValidationMessage> errors = new ArrayList<ValidationMessage>();
+        // 1. Load and Parse
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        factory.setNamespaceAware(true); 
+        Document doc = factory.newDocumentBuilder().parse(new File(filePath));
+
+        // 2. Setup XPath with Namespaces
+        XPath xpath = XPathFactory.newInstance().newXPath();
+        xpath.setNamespaceContext(new UBLNamespaceContext());
+
+        
+        //. Fetch Validation Rules From DB
+        
+       List<ValidationRules> validationRules =  validationRulesRepository.findAll();
+        
+        // 3. Extract Values and Attributes
+       
+       validationRules.forEach(rule->{
+    	   try {
+			String value = xpath.evaluate("/invoice:"+rule.getUBLXPath(), doc);
+			if(rule.getFlag() == 'M' && (value == null || value.isBlank()))
+			{
+				ValidationMessage validationResponse = new ValidationMessage(rule.getErrorCode(),"FIELD_VALIDATION",rule.getErrorMessageTemplate(),"ERROR",rule.getUBLXPath());
+				// validationResponse.setCategory();
+				// validationResponse.setCode();
+				// validationResponse.setStatus();
+				// validationResponse.setUblPath();
+				// validationResponse.setMessage();
+				
+				errors.add(validationResponse);
+			}
+		   } catch (XPathExpressionException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		   }
+       });
+      return errors;
+    }
+
 }
