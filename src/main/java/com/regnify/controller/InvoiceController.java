@@ -19,9 +19,16 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.List;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+
+import com.regnify.dto.response.ValidationMessage;
 
 @RestController
 @RequestMapping("/invoices")
@@ -40,6 +47,33 @@ public class InvoiceController {
         InvoiceResponse response = invoiceService.uploadInvoice(request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Invoice uploaded successfully", response));
+    }
+    
+    @PostMapping(value = "/uploadInvoice", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Upload invoice Only", description = "Upload and validate a new invoice")
+    @PreAuthorize("hasRole('VIEWER') or hasRole('SUPER_USER') or hasRole('ADMIN_MODERATOR')")
+    public ResponseEntity<ApiResponse<List<ValidationMessage>>> uploadInvoiceOnly(
+             @RequestPart("file") MultipartFile file) throws IOException {
+            	
+    	try {
+    		
+	    		// Convert MultipartFile or InputStream to a temp file
+	    		Path tempPath = Files.createTempFile("invoice_", ".xml");
+	    		try (InputStream is = file.getInputStream()) {
+	    		    Files.copy(is, tempPath, StandardCopyOption.REPLACE_EXISTING);
+	    		}
+	    		String absolutePath = tempPath.toAbsolutePath().toString();
+	    		
+	    		List<ValidationMessage> errors = invoiceService.processInvoice(absolutePath);
+	    		
+	    		return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(errors));
+    		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+    	
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Invoice uploaded successfully",null));
     }
     
     @GetMapping
